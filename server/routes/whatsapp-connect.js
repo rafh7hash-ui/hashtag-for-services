@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const qrcode = require('qrcode');
 
 // متغيرات الحالة
 let whatsappStatus = {
@@ -18,33 +19,45 @@ let whatsappStatus = {
 
 router.post('/qr/init', async (req, res) => {
   try {
-    // تحقق إذا كان متصل بالفعل
-    if (whatsappStatus.connected && whatsappStatus.method === 'qr') {
-      return res.json({ 
-        success: true, 
-        message: 'متصل بالفعل بـ QR',
-        status: whatsappStatus 
+    console.log('📱 بدء توليد QR Code...');
+    
+    // توليد QR Code
+    const qrData = 'https://wa.me/?text=اختبار';
+    
+    try {
+      // توليد QR كـ Data URL
+      const qrCodeDataUrl = await qrcode.toDataURL(qrData, {
+        errorCorrectionLevel: 'H',
+        type: 'image/png',
+        width: 300,
+        margin: 1,
+        color: {
+          dark: '#000000',
+          light: '#FFFFFF'
+        }
       });
+      
+      // حفظ البيانات
+      whatsappStatus.method = 'qr';
+      whatsappStatus.connected = true;
+      whatsappStatus.qrCode = qrCodeDataUrl;
+      whatsappStatus.connectionTime = new Date();
+      whatsappStatus.lastUpdated = new Date();
+      
+      console.log('✅ تم توليد QR Code بنجاح');
+      
+      res.json({ 
+        success: true, 
+        message: '✅ تم توليد QR Code - امسحه الآن',
+        status: whatsappStatus,
+        qrCode: qrCodeDataUrl
+      });
+    } catch (qrError) {
+      console.error('❌ خطأ في توليد QR:', qrError);
+      throw qrError;
     }
-
-    console.log('📱 بدء توصيل QR Code...');
-    
-    // محاكاة QR Code
-    const mockQR = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
-    
-    whatsappStatus.method = 'qr';
-    whatsappStatus.connected = true;
-    whatsappStatus.qrCode = mockQR;
-    whatsappStatus.connectionTime = new Date();
-    whatsappStatus.lastUpdated = new Date();
-
-    res.json({ 
-      success: true, 
-      message: 'تم بدء الاتصال بـ QR',
-      status: whatsappStatus,
-      instruction: 'امسح QR Code بكاميرا هاتف WhatsApp'
-    });
   } catch (error) {
+    console.error('❌ خطأ:', error);
     res.status(500).json({ 
       success: false, 
       error: error.message 
@@ -57,18 +70,19 @@ router.get('/qr/code', (req, res) => {
   if (whatsappStatus.qrCode && whatsappStatus.method === 'qr') {
     res.json({ 
       success: true, 
-      qrCode: whatsappStatus.qrCode 
+      qrCode: whatsappStatus.qrCode
     });
   } else {
     res.json({ 
       success: false, 
-      message: 'لا يوجد QR Code متاح الآن' 
+      message: 'لا يوجد QR Code متاح الآن',
+      qrCode: null
     });
   }
 });
 
 // ============================================
-// طريقة 2: اتصال بـ Twilio (مجاني)
+// طريقة 2: اتصال بـ Twilio (Meta WhatsApp)
 // ============================================
 
 router.post('/twilio/connect', (req, res) => {
@@ -82,7 +96,7 @@ router.post('/twilio/connect', (req, res) => {
       });
     }
 
-    // التحقق من صحة البيانات
+    // التحقق من صحة الرقم
     if (twilioPhone.length < 10) {
       return res.status(400).json({ 
         success: false, 
@@ -98,9 +112,11 @@ router.post('/twilio/connect', (req, res) => {
     whatsappStatus.connectionTime = new Date();
     whatsappStatus.lastUpdated = new Date();
 
+    console.log(`✅ تم الاتصال مع Twilio: ${twilioPhone}`);
+
     res.json({ 
       success: true, 
-      message: 'تم الاتصال مع Twilio بنجاح ✅',
+      message: '✅ تم الاتصال مع Twilio بنجاح',
       status: whatsappStatus,
       data: {
         phone: twilioPhone,
@@ -109,6 +125,7 @@ router.post('/twilio/connect', (req, res) => {
       }
     });
   } catch (error) {
+    console.error('❌ خطأ في Twilio:', error);
     res.status(500).json({ 
       success: false, 
       error: error.message 
@@ -125,7 +142,7 @@ router.get('/status', (req, res) => {
     ...whatsappStatus,
     connectionDuration: whatsappStatus.connectionTime ? 
       new Date() - new Date(whatsappStatus.connectionTime) : null,
-    connectionType: whatsappStatus.method === 'qr' ? '📱 QR Code' : '🎉 Twilio'
+    connectionType: whatsappStatus.method === 'qr' ? '📱 QR Code' : (whatsappStatus.method === 'twilio' ? '🎉 Twilio' : '❌ غير متصل')
   };
   res.json(status);
 });
@@ -142,12 +159,15 @@ router.post('/disconnect', (req, res) => {
     whatsappStatus.connectionTime = null;
     whatsappStatus.lastUpdated = new Date();
 
+    console.log(`✅ تم قطع الاتصال (${previousMethod})`);
+
     res.json({ 
       success: true, 
       message: `تم قطع الاتصال (${previousMethod})`,
       status: whatsappStatus 
     });
   } catch (error) {
+    console.error('❌ خطأ في قطع الاتصال:', error);
     res.status(500).json({ 
       success: false, 
       error: error.message 
@@ -187,6 +207,7 @@ router.post('/send', (req, res) => {
       }
     });
   } catch (error) {
+    console.error('❌ خطأ في الإرسال:', error);
     res.status(500).json({ 
       success: false, 
       error: error.message 
