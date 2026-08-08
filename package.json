@@ -1,14 +1,13 @@
 {
   "name": "hashtag-for-services",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "نظام إدارة الخدمات والموظفين مع WhatsApp",
   "main": "server/index.js",
   "scripts": {
     "start": "node server/index.js",
-    "dev": "nodemon server/index.js",
-    "client": "cd client && npm start"
+    "dev": "nodemon server/index.js"
   },
-  "keywords": ["services", "whatsapp", "management"],
+  "keywords": ["services", "whatsapp", "management", "twilio", "qr"],
   "author": "rafh7hash-ui",
   "license": "MIT",
   "dependencies": {
@@ -17,7 +16,9 @@
     "dotenv": "^16.0.3",
     "cors": "^2.8.5",
     "sqlite3": "^5.1.6",
-    "body-parser": "^1.20.2"
+    "body-parser": "^1.20.2",
+    "qrcode": "^1.5.3",
+    "twilio": "^3.83.0"
   },
   "devDependencies": {
     "nodemon": "^2.0.22"
