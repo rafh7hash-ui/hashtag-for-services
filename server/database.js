@@ -1,20 +1,35 @@
 const sqlite3 = require('sqlite3').verbose();
+const fs = require('fs');
 const path = require('path');
 
-const dbPath = path.join(__dirname, '../data/hashtag.db');
+const dataDir = path.join(__dirname, '../data');
 
-const db = new sqlite3.Database(dbPath, (err) => {
-  if (err) {
-    console.error('Database connection error:', err);
-  } else {
-    console.log('✅ Connected to SQLite database');
+if (!fs.existsSync(dataDir)) {
+  fs.mkdirSync(dataDir, { recursive: true });
+}
+
+const dbPath = path.join(dataDir, 'hashtag.db');
+
+const db = new sqlite3.Database(
+  dbPath,
+  sqlite3.OPEN_READWRITE | sqlite3.OPEN_CREATE,
+  (err) => {
+    if (err) {
+      console.error('❌ Database connection error:', err.message);
+      return;
+    }
+
+    console.log('✅ Connected to SQLite database:', dbPath);
     initializeTables();
   }
+);
+
+db.on('error', (err) => {
+  console.error('❌ SQLite runtime error:', err.message);
 });
 
 function initializeTables() {
   db.serialize(() => {
-    // Employees table
     db.run(`
       CREATE TABLE IF NOT EXISTS employees (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -26,7 +41,6 @@ function initializeTables() {
       )
     `);
 
-    // Services table
     db.run(`
       CREATE TABLE IF NOT EXISTS services (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -37,7 +51,6 @@ function initializeTables() {
       )
     `);
 
-    // Employee Services (many-to-many)
     db.run(`
       CREATE TABLE IF NOT EXISTS employee_services (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -49,7 +62,6 @@ function initializeTables() {
       )
     `);
 
-    // Messages table
     db.run(`
       CREATE TABLE IF NOT EXISTS messages (
         id INTEGER PRIMARY KEY AUTOINCREMENT,

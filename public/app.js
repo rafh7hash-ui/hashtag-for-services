@@ -14,6 +14,8 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function renderApp() {
+  if (!app) return;
+
   app.innerHTML = `
     <div class="container">
       <header>
@@ -28,7 +30,6 @@ function renderApp() {
         <button onclick="switchTab('whatsapp')" class="tab-btn">💬 WhatsApp</button>
       </div>
 
-      <!-- Employees Section -->
       <div id="employees" class="section active">
         <div class="card">
           <h2>إضافة موظف جديد</h2>
@@ -51,7 +52,6 @@ function renderApp() {
         <div id="employeesList" class="list"></div>
       </div>
 
-      <!-- Services Section -->
       <div id="services" class="section">
         <div class="card">
           <h2>إضافة خدمة جديدة</h2>
@@ -75,7 +75,6 @@ function renderApp() {
         <div id="servicesList" class="list"></div>
       </div>
 
-      <!-- Messages Section -->
       <div id="messages" class="section">
         <div class="card">
           <h2>إضافة رسالة ترحيب أو رد</h2>
@@ -99,7 +98,6 @@ function renderApp() {
         <div id="messagesList" class="list"></div>
       </div>
 
-      <!-- WhatsApp Section -->
       <div id="whatsapp" class="section">
         <div class="card">
           <h2>⚙️ إعدادات WhatsApp</h2>
@@ -126,29 +124,28 @@ function renderApp() {
 }
 
 function initEventListeners() {
-  document.getElementById('employeeForm').addEventListener('submit', handleAddEmployee);
-  document.getElementById('serviceForm').addEventListener('submit', handleAddService);
-  document.getElementById('messageForm').addEventListener('submit', handleAddMessage);
-  document.getElementById('whatsappForm').addEventListener('submit', handleSaveWhatsapp);
+  const employeeForm = document.getElementById('employeeForm');
+  const serviceForm = document.getElementById('serviceForm');
+  const messageForm = document.getElementById('messageForm');
+  const whatsappForm = document.getElementById('whatsappForm');
+
+  if (employeeForm) employeeForm.addEventListener('submit', handleAddEmployee);
+  if (serviceForm) serviceForm.addEventListener('submit', handleAddService);
+  if (messageForm) messageForm.addEventListener('submit', handleAddMessage);
+  if (whatsappForm) whatsappForm.addEventListener('submit', handleSaveWhatsapp);
 }
 
 function switchTab(tabName) {
-  // Hide all sections
-  document.querySelectorAll('.section').forEach(section => {
-    section.classList.remove('active');
+  document.querySelectorAll('.section').forEach((section) => {
+    section.classList.toggle('active', section.id === tabName);
   });
-  
-  // Remove active class from buttons
-  document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.classList.remove('active');
+
+  document.querySelectorAll('.tab-btn').forEach((btn) => {
+    const onclick = btn.getAttribute('onclick') || '';
+    btn.classList.toggle('active', onclick.includes(`'${tabName}'`));
   });
-  
-  // Show selected section
-  document.getElementById(tabName).classList.add('active');
-  event.target.classList.add('active');
 }
 
-// Employees Functions
 async function loadEmployees() {
   try {
     const response = await fetch(`${API_URL}/employees`);
@@ -161,18 +158,20 @@ async function loadEmployees() {
 
 function renderEmployees(employees) {
   const list = document.getElementById('employeesList');
-  if (employees.length === 0) {
+  if (!list) return;
+
+  if (!employees || employees.length === 0) {
     list.innerHTML = '<p style="grid-column: 1/-1; text-align: center;">لا توجد موظفين بعد</p>';
     return;
   }
-  
-  list.innerHTML = employees.map(emp => `
+
+  list.innerHTML = employees.map((emp) => `
     <div class="item">
       <div class="item-header">
-        <div class="item-title">${emp.icon} ${emp.name}</div>
+        <div class="item-title">${emp.icon || '👤'} ${emp.name}</div>
       </div>
       <div class="item-meta">📱 ${emp.phone}</div>
-      <div class="item-meta">الحالة: <strong>${emp.status}</strong></div>
+      <div class="item-meta">الحالة: <strong>${emp.status || 'active'}</strong></div>
       <div class="actions">
         <button class="btn-info" onclick="editEmployee(${emp.id})">✏️ تعديل</button>
         <button class="btn-danger" onclick="deleteEmployee(${emp.id})">🗑️ حذف</button>
@@ -183,22 +182,30 @@ function renderEmployees(employees) {
 
 async function handleAddEmployee(e) {
   e.preventDefault();
-  
-  const name = document.getElementById('empName').value;
-  const phone = document.getElementById('empPhone').value;
-  const icon = document.getElementById('empIcon').value;
-  
+
+  const name = document.getElementById('empName').value.trim();
+  const phone = document.getElementById('empPhone').value.trim();
+  const icon = document.getElementById('empIcon').value.trim() || '👤';
+
+  if (!name || !phone) {
+    showMessage('❌ الاسم ورقم الجوال مطلوبان', true);
+    return;
+  }
+
   try {
     const response = await fetch(`${API_URL}/employees`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, phone, icon })
     });
-    
+
     if (response.ok) {
       document.getElementById('employeeForm').reset();
       loadEmployees();
       showMessage('✅ تم إضافة الموظف بنجاح');
+    } else {
+      const data = await response.json();
+      showMessage(data.error || '❌ فشل في إضافة الموظف', true);
     }
   } catch (error) {
     console.error('Error adding employee:', error);
@@ -208,7 +215,7 @@ async function handleAddEmployee(e) {
 
 async function deleteEmployee(id) {
   if (!confirm('هل أنت متأكد من حذف هذا الموظف؟')) return;
-  
+
   try {
     await fetch(`${API_URL}/employees/${id}`, { method: 'DELETE' });
     loadEmployees();
@@ -218,7 +225,6 @@ async function deleteEmployee(id) {
   }
 }
 
-// Services Functions
 async function loadServices() {
   try {
     const response = await fetch(`${API_URL}/services`);
@@ -231,15 +237,17 @@ async function loadServices() {
 
 function renderServices(services) {
   const list = document.getElementById('servicesList');
-  if (services.length === 0) {
+  if (!list) return;
+
+  if (!services || services.length === 0) {
     list.innerHTML = '<p style="grid-column: 1/-1; text-align: center;">لا توجد خدمات بعد</p>';
     return;
   }
-  
-  list.innerHTML = services.map(serv => `
+
+  list.innerHTML = services.map((serv) => `
     <div class="item">
       <div class="item-header">
-        <div class="item-title">${serv.icon} ${serv.name}</div>
+        <div class="item-title">${serv.icon || '📋'} ${serv.name}</div>
       </div>
       <div class="item-meta">${serv.is_shared ? '🔗 خدمة مشتركة' : '👤 خدمة فردية'}</div>
       <div class="actions">
@@ -252,22 +260,30 @@ function renderServices(services) {
 
 async function handleAddService(e) {
   e.preventDefault();
-  
-  const name = document.getElementById('servName').value;
-  const icon = document.getElementById('servIcon').value;
+
+  const name = document.getElementById('servName').value.trim();
+  const icon = document.getElementById('servIcon').value.trim() || '📋';
   const is_shared = document.getElementById('servShared').checked;
-  
+
+  if (!name) {
+    showMessage('❌ اسم الخدمة مطلوب', true);
+    return;
+  }
+
   try {
     const response = await fetch(`${API_URL}/services`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, icon, is_shared })
     });
-    
+
     if (response.ok) {
       document.getElementById('serviceForm').reset();
       loadServices();
       showMessage('✅ تم إضافة الخدمة بنجاح');
+    } else {
+      const data = await response.json();
+      showMessage(data.error || '❌ فشل في إضافة الخدمة', true);
     }
   } catch (error) {
     console.error('Error adding service:', error);
@@ -277,7 +293,7 @@ async function handleAddService(e) {
 
 async function deleteService(id) {
   if (!confirm('هل أنت متأكد من حذف هذه الخدمة؟')) return;
-  
+
   try {
     await fetch(`${API_URL}/services/${id}`, { method: 'DELETE' });
     loadServices();
@@ -287,7 +303,6 @@ async function deleteService(id) {
   }
 }
 
-// Messages Functions
 async function loadMessages() {
   try {
     const response = await fetch(`${API_URL}/messages`);
@@ -300,18 +315,20 @@ async function loadMessages() {
 
 function renderMessages(messages) {
   const list = document.getElementById('messagesList');
-  if (messages.length === 0) {
+  if (!list) return;
+
+  if (!messages || messages.length === 0) {
     list.innerHTML = '<p style="grid-column: 1/-1; text-align: center;">لا توجد رسائل بعد</p>';
     return;
   }
-  
+
   const typeLabels = {
     welcome: '🎉 رسالة ترحيب',
     response: '💬 رد سريع',
     shared_service: '🔗 خدمة مشتركة'
   };
-  
-  list.innerHTML = messages.map(msg => `
+
+  list.innerHTML = messages.map((msg) => `
     <div class="item">
       <div class="item-header">
         <div class="item-title">${typeLabels[msg.type] || msg.type}</div>
@@ -326,21 +343,29 @@ function renderMessages(messages) {
 
 async function handleAddMessage(e) {
   e.preventDefault();
-  
+
   const type = document.getElementById('msgType').value;
-  const content = document.getElementById('msgContent').value;
-  
+  const content = document.getElementById('msgContent').value.trim();
+
+  if (!type || !content) {
+    showMessage('❌ النوع والمحتوى مطلوبان', true);
+    return;
+  }
+
   try {
     const response = await fetch(`${API_URL}/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ type, content })
     });
-    
+
     if (response.ok) {
       document.getElementById('messageForm').reset();
       loadMessages();
       showMessage('✅ تم حفظ الرسالة بنجاح');
+    } else {
+      const data = await response.json();
+      showMessage(data.error || '❌ فشل في حفظ الرسالة', true);
     }
   } catch (error) {
     console.error('Error adding message:', error);
@@ -350,7 +375,7 @@ async function handleAddMessage(e) {
 
 async function deleteMessage(id) {
   if (!confirm('هل أنت متأكد من حذف هذه الرسالة؟')) return;
-  
+
   try {
     await fetch(`${API_URL}/messages/${id}`, { method: 'DELETE' });
     loadMessages();
@@ -360,11 +385,12 @@ async function deleteMessage(id) {
   }
 }
 
-// WhatsApp Functions
 async function testWhatsapp() {
   try {
     const response = await fetch(`${API_URL}/whatsapp/config`);
+    if (!response.ok) throw new Error('Request failed');
     const config = await response.json();
+    console.log('WhatsApp config loaded:', config);
     showMessage('✅ الاتصال بـ WhatsApp يعمل بنجاح!');
   } catch (error) {
     showMessage('❌ خطأ في الاتصال بـ WhatsApp', true);
@@ -376,15 +402,15 @@ async function handleSaveWhatsapp(e) {
   showMessage('⚠️ يرجى تحديث متغيرات البيئة يدويًا في ملف .env');
 }
 
-// Utility Functions
 function showMessage(msg, isError = false) {
+  const container = document.querySelector('.container');
+  if (!container) return;
+
   const div = document.createElement('div');
   div.className = isError ? 'error-message' : 'success-message';
   div.textContent = msg;
-  
-  const container = document.querySelector('.container');
+
   container.insertBefore(div, container.firstChild);
-  
   setTimeout(() => div.remove(), 4000);
 }
 
